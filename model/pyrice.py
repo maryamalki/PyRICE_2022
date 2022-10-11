@@ -236,7 +236,7 @@ class PyRICE(object):
             self.year = self.start_year + self.tstep * t
 
             # Run gross economy in economic sub-model
-            E, Y_gross = self.econ_model.run_gross_economy(
+            E, Y_gross, Eind, sigma_region = self.econ_model.run_gross_economy(
                 scenario_pop_gdp,
                 self.tstep,
                 t,
@@ -285,6 +285,7 @@ class PyRICE(object):
                 self.utility_model.emcu,
             )
 
+        
             # Compute Utility
             climate_impact_relative_to_capita = (
                 self.econ_model.get_climate_impact_relative_to_capita()
@@ -495,6 +496,9 @@ class PyRICE(object):
 
         return self.utility_model.data
 
+    def get_econ_model_results(self):
+        return self.econ_model
+
     def view_better_formatted_results(self):
         """
         Prints the attributes of the Results object.
@@ -522,6 +526,7 @@ class PyRICE(object):
 
         print("Dataframe on CPC post damage")
         print(self.utility_model.data.df_cpc_post_damage)
+
 
 
 if __name__ == "__main__":

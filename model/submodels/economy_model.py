@@ -347,6 +347,8 @@ class EconomyModel:
         @return:
             self.Y_gross: numpy array (12, 31)
             self.E: numpy array (12, 31)
+            self.Eind: numpy array (12, 31)
+            self.sigma_region: numpy array (12, 31)
         """
 
         # use SSP population projections if not base with right SSP scenario (SSP1, SSP2 etc.)
@@ -582,7 +584,7 @@ class EconomyModel:
         # total cummulative emissions
         self.CCA_tot = self.CCA[:, t] + self.cumetree[:, t]
 
-        return self.E, self.Y_gross
+        return self.E, self.Y_gross, self.Eind, self.sigma_region #added Eind and sigma_region
 
     def run_net_economy(
         self,
