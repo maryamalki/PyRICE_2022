@@ -4,15 +4,21 @@ This module contains the economic part of the PyRICE model.
 
 
 from model.enumerations import ModelSpec, DamageFunction
-import numpy as np
+from model.data_sets import DataSets
 
+import numpy as np
+import math
+from typing import List
+import pandas as pd
+
+TIMESTEP = 10
 
 class EconomyModel:
     """
     This sub-model describes the neoclassical economic part of the PyRICE model.
     """
 
-    def __init__(self, data_sets, steps, scenario_cback, regions_list):
+    def __init__(self, data_sets: DataSets, steps: int, scenario_cback, regions_list: List[str]):
         """
         @param data_sets: DataSets
         @param steps: int (31)
@@ -66,6 +72,11 @@ class EconomyModel:
         self.Mabatement_cost = np.zeros((self.n_regions, steps))
         self.CPRICE = np.zeros((self.n_regions, steps))
 
+        # Dataframes for primary energy, energy intensity, carbon intensity
+        self.primary_energy_kwh = np.zeros((self.n_regions, steps))
+        self.energy_intensity = np.zeros((self.n_regions, steps))
+        self.carbon_intensity = np.zeros((self.n_regions, steps))
+
         # economy parameters per region
         self.Y = np.zeros((self.n_regions, steps))
         self.I = np.zeros((self.n_regions, steps))
@@ -80,18 +91,16 @@ class EconomyModel:
         self.climate_impact_relative_to_capita = {}
 
         # Output-to-Emission
-        # Change in sigma: the cumulative improvement in energy efficiency)
+        # Change in sigma: the cumulative improvement in energy efficiency
         self.sigma_growth_data = data_sets.RICE_DATA.iloc[70:82, 1:6].to_numpy()
-        self.Emissions_parameter = (
-            data_sets.RICE_PARAMETER.iloc[65:70, 5:17].to_numpy().transpose()
-        )
+        self.Emissions_parameter = data_sets.RICE_PARAMETER.iloc[65:70, 5:17].to_numpy().transpose()
 
         # set up dataframe for saving_results CO2 to output ratio
         self.Sigma_gr = np.zeros((self.n_regions, steps))
         self.Sigma_gr_RICE = np.zeros((self.n_regions, steps))
 
         # CO2-equivalent-emissions growth to output ratio in 2005
-        self.Sigma_gr[:, 0] = self.sigma_growth_data[:, 0]
+        #self.Sigma_gr[:, 0] = self.sigma_growth_data[:, 0]
 
         # Fraction of emissions under control based on the Paris Agreement
         # US withdrawal would change the value to 0.7086
@@ -114,15 +123,39 @@ class EconomyModel:
         self.Eland0 = 1.6  # (RICE2010 OPT)
 
         # Cost of abatement
-        self.abatement_data = (
-            data_sets.RICE_PARAMETER.iloc[56:60, 5:17].to_numpy().transpose()
-        )
+        self.abatement_data = data_sets.RICE_PARAMETER.iloc[56:60, 5:17].to_numpy().transpose()
         self.pbacktime = np.zeros((self.n_regions, steps))
         self.cost1 = np.zeros((self.n_regions, steps))
 
         # CO2 to economy ratio
+        #self.sigma_region = np.zeros((self.n_regions, steps))
+        #self.sigma_region[:, 0] = self.Emissions_parameter[:, 2]
+
+        # Sigma calculations
         self.sigma_region = np.zeros((self.n_regions, steps))
-        self.sigma_region[:, 0] = self.Emissions_parameter[:, 2]
+        self.carbon_intensity[:, 0] = self.data_sets.carbon_emissions_kg.loc[2005] / self.data_sets.primary_energy_kwh.loc[2005]
+        self.energy_intensity[:, 0] = self.data_sets.primary_energy_kwh.loc[2005] / (self.initials_par[:, 2] * (10**12))  # Converting gdp from trillion
+
+        # Calculate sigma from CI and EI
+        self.sigma_region[:, 0] = self.carbon_intensity[:, 0] * self.energy_intensity[:, 0]
+
+        # Calculate growth rates per region
+        chosen_range = slice(1995, 2006)
+        CI_gr_2005: pd.Series = self.data_sets.carbon_intensity.loc[chosen_range].pct_change().dropna().mean(skipna=True)
+        EI_gr_2005: pd.Series = self.data_sets.energy_intensity.loc[chosen_range].pct_change().dropna().mean(skipna=True)
+
+        # Compile initial sigma growth
+        # CO2-equivalent-emissions growth to output ratio in 2005
+        self.Sigma_gr[:, 0] = (CI_gr_2005 + EI_gr_2005).to_numpy()
+
+        # 10 year average growth rates for CI and EI 1995-2005
+        self.ei_decline_rate = -0.02
+        self.ci_decline_rate = -0.005
+
+        self.ei_growth = np.zeros((self.n_regions, steps))
+        self.ci_growth = np.zeros((self.n_regions, steps))
+        self.ei_growth[:, 0] = EI_gr_2005.to_numpy()
+        self.ci_growth[:, 0] = CI_gr_2005.to_numpy()
 
         # Cback per region
         ratio_backstop_world = np.array(
@@ -356,60 +389,34 @@ class EconomyModel:
             # load population and gdp projections from SSP scenarios on first timestep
             if t == 1:
                 for region in range(0, self.n_regions):
-                    self.region_pop[region, :] = self.data_sets.POP_ssp.iloc[
-                        :, (scenario_pop_gdp - 1) + (region * 5)
-                    ]
+                    self.region_pop[region, :] = self.data_sets.POP_ssp.iloc[:, (scenario_pop_gdp - 1) + (region * 5)]
 
-                    self.Y_gross[region, :] = (
-                        self.data_sets.GDP_ssp.iloc[
-                            :, (scenario_pop_gdp - 1) + (region * 5)
-                        ]
-                        / 1000
-                    )
+                    self.Y_gross[region, :] = self.data_sets.GDP_ssp.iloc[:, (scenario_pop_gdp - 1) + (region * 5)]/ 1000
 
             self.Y_gross[:, t] = np.where(self.Y_gross[:, t] > 0, self.Y_gross[:, t], 0)
 
-            self.k_region[:, t] = (
-                self.k_region[:, t - 1] * ((1 - self.dk) ** tstep)
-                + tstep * self.I[:, t - 1]
-            )
+            self.k_region[:, t] = self.k_region[:, t - 1] * ((1 - self.dk) ** tstep) + tstep * self.I[:, t - 1]
 
             # calculate tfp based on GDP projections by SSP's
-            self.tfp_region[:, t] = self.Y_gross[:, t] / (
-                (self.k_region[:, t] ** self.gama)
-                * (self.region_pop[:, t] / 1000) ** (1 - self.gama)
-            )
+            self.tfp_region[:, t] = self.Y_gross[:, t] / (self.k_region[:, t] ** self.gama)* (self.region_pop[:, t] / 1000) ** (1 - self.gama)
 
         # Use base projections for population and TFP and sigma growth
         if scenario_pop_gdp == 0 and longrun_scenario == 0:
 
             # calculate population at time t
-            self.region_pop[:, t] = self.region_pop[:, t - 1] * 2.71828 ** (
-                self.region_pop_gr[:, t] * 10
-            )
+            self.region_pop[:, t] = self.region_pop[:, t - 1] * 2.71828 ** (self.region_pop_gr[:, t] * 10)
 
             # TOTAL FACTOR PRODUCTIVITY level according to RICE base
-            self.tfp_region[:, t] = self.tfp_region[:, t - 1] * 2.71828 ** (
-                self.tfpgr_region[:, t] * 10
-            )
+            self.tfp_region[:, t] = self.tfp_region[:, t - 1] * 2.71828 ** (self.tfpgr_region[:, t] * 10)
 
             # determine capital stock at time t
-            self.k_region[:, t] = (
-                self.k_region[:, t - 1] * ((1 - self.dk) ** tstep)
-                + tstep * self.I[:, t - 1]
-            )
+            self.k_region[:, t] = self.k_region[:, t - 1] * ((1 - self.dk) ** tstep) + tstep * self.I[:, t - 1]
 
             # lower bound capital
-            self.k_region[:, t] = np.where(
-                self.k_region[:, t] > 1, self.k_region[:, t], 1
-            )
+            self.k_region[:, t] = np.where(self.k_region[:, t] > 1, self.k_region[:, t], 1)
 
             # determine Ygross at time t
-            self.Y_gross[:, t] = (
-                self.tfp_region[:, t]
-                * ((self.region_pop[:, t] / 1000) ** (1 - self.gama))
-                * (self.k_region[:, t] ** self.gama)
-            )
+            self.Y_gross[:, t] = (self.tfp_region[:, t] * ((self.region_pop[:, t] / 1000) ** (1 - self.gama)) * (self.k_region[:, t] ** self.gama))
 
             # lower bound Y_Gross
             self.Y_gross[:, t] = np.where(self.Y_gross[:, t] > 0, self.Y_gross[:, t], 0)
@@ -447,103 +454,118 @@ class EconomyModel:
             # lower bound Y_Gross
             self.Y_gross[:, t] = np.where(self.Y_gross[:, t] > 0, self.Y_gross[:, t], 0)
 
+
             # calculate the sigma growth adjust with uncertainty range and the emission rate development
             if t == 1:
-                self.Sigma_gr[:, t] = self.sigma_growth_data[:, 4] + (
-                    self.sigma_growth_data[:, 2] - self.sigma_growth_data[:, 4]
-                )
-
-                self.sigma_region[:, t] = (
-                    self.sigma_region[:, t - 1]
-                    * (2.71828 ** (self.Sigma_gr[:, t] * 10))
-                    * self.emission_factor
-                )
-
+                self.ei_growth[:, t] = self.ei_growth[:, 0]
+                self.ci_growth[:, t] = self.ci_growth[:, 0]
+                self.Sigma_gr[:, t] = self.ei_growth[:, t] + self.ci_growth[:, t]
+                self.sigma_region[:, t] = self.sigma_region[:, t - 1] * (math.e ** (self.Sigma_gr[:, t] * TIMESTEP)) * self.emission_factor
             if t > 1:
-                self.Sigma_gr[:, t] = (
-                    self.sigma_growth_data[:, 4]
-                    + (self.Sigma_gr[:, t - 1] - self.sigma_growth_data[:, 4])
-                    * (1 - self.sigma_growth_data[:, 3])
-                ) * long_run_nordhaus_sigma
+                self.ei_growth[:, t] = self.ei_growth[:, t - 1] * (1 + self.ei_decline_rate * TIMESTEP) * long_run_nordhaus_sigma
+                self.ci_growth[:, t] = self.ci_growth[:, t - 1] * (1 + self.ci_decline_rate * TIMESTEP) * long_run_nordhaus_sigma
 
-                self.sigma_region[:, t] = self.sigma_region[:, t - 1] * (
-                    2.71828 ** (self.Sigma_gr[:, t] * 10)
-                )
+                self.Sigma_gr[:, t] = self.ei_growth[:, t] + self.ci_growth[:, t]
+                self.sigma_region[:, t] = self.sigma_region[:, t - 1] * (math.e ** (self.Sigma_gr[:, t] * TIMESTEP))
+            
 
-        if longrun_scenario != 1:
-            if scenario_sigma == 0:  # medium SSP AEEI (base RICE)
+            # calculate the sigma growth adjust with uncertainty range and the emission rate development
+            # if t == 1:
+            #     self.Sigma_gr[:, t] = self.sigma_growth_data[:, 4] + (
+            #         self.sigma_growth_data[:, 2] - self.sigma_growth_data[:, 4]
+            #     )
 
-                # calculate the sigma growth and the emission rate development
-                if t == 1:
-                    self.Sigma_gr[:, t] = self.sigma_growth_data[:, 4] + (
-                        self.sigma_growth_data[:, 2] - self.sigma_growth_data[:, 4]
-                    )
+            #     self.sigma_region[:, t] = (
+            #         self.sigma_region[:, t - 1]
+            #         * (2.71828 ** (self.Sigma_gr[:, t] * 10))
+            #         * self.emission_factor
+            #     )
 
-                    self.sigma_region[:, t] = (
-                        self.sigma_region[:, t - 1]
-                        * (2.71828 ** (self.Sigma_gr[:, t] * 10))
-                        * self.emission_factor
-                    )
+            # if t > 1:
+            #     self.Sigma_gr[:, t] = (
+            #         self.sigma_growth_data[:, 4]
+            #         + (self.Sigma_gr[:, t - 1] - self.sigma_growth_data[:, 4])
+            #         * (1 - self.sigma_growth_data[:, 3])
+            #     ) * long_run_nordhaus_sigma
 
-                if t > 1:
-                    self.Sigma_gr[:, t] = self.sigma_growth_data[:, 4] + (
-                        self.Sigma_gr[:, t - 1] - self.sigma_growth_data[:, 4]
-                    ) * (1 - self.sigma_growth_data[:, 3])
+            #     self.sigma_region[:, t] = self.sigma_region[:, t - 1] * (
+            #         2.71828 ** (self.Sigma_gr[:, t] * 10)
+            #     )
 
-                    self.sigma_region[:, t] = self.sigma_region[:, t - 1] * (
-                        2.71828 ** (self.Sigma_gr[:, t] * 10)
-                    )
+        # if longrun_scenario != 1:
+        #     if scenario_sigma == 0:  # medium SSP AEEI (base RICE)
 
-            if scenario_sigma == 1:  # low SSP AEEI
+        #         # calculate the sigma growth and the emission rate development
+        #         if t == 1:
+        #             self.Sigma_gr[:, t] = self.sigma_growth_data[:, 4] + (
+        #                 self.sigma_growth_data[:, 2] - self.sigma_growth_data[:, 4]
+        #             )
 
-                # calculate the sigma growth and the emission rate development
-                if t == 1:
-                    self.Sigma_gr_RICE[:, t] = self.sigma_growth_data[:, 4] + (
-                        self.sigma_growth_data[:, 2] - self.sigma_growth_data[:, 4]
-                    )
+        #             self.sigma_region[:, t] = (
+        #                 self.sigma_region[:, t - 1]
+        #                 * (2.71828 ** (self.Sigma_gr[:, t] * 10))
+        #                 * self.emission_factor
+        #             )
 
-                    self.Sigma_gr[:, t] = self.Sigma_gr_RICE[:, t]
+        #         if t > 1:
+        #             self.Sigma_gr[:, t] = self.sigma_growth_data[:, 4] + (
+        #                 self.Sigma_gr[:, t - 1] - self.sigma_growth_data[:, 4]
+        #             ) * (1 - self.sigma_growth_data[:, 3])
 
-                    self.sigma_region[:, t] = (
-                        self.sigma_region[:, t - 1]
-                        * (2.71828 ** (self.Sigma_gr[:, t] * 10))
-                        * self.emission_factor
-                    )
+        #             self.sigma_region[:, t] = self.sigma_region[:, t - 1] * (
+        #                 2.71828 ** (self.Sigma_gr[:, t] * 10)
+        #             )
 
-                if t > 1:
-                    self.Sigma_gr_RICE[:, t] = self.sigma_growth_data[:, 4] + (
-                        self.Sigma_gr_RICE[:, t - 1] - self.sigma_growth_data[:, 4]
-                    ) * (1 - self.sigma_growth_data[:, 3])
+        #     if scenario_sigma == 1:  # low SSP AEEI
 
-                    self.Sigma_gr[:, t] = self.Sigma_gr_RICE[:, t] * 0.5
+        #         # calculate the sigma growth and the emission rate development
+        #         if t == 1:
+        #             self.Sigma_gr_RICE[:, t] = self.sigma_growth_data[:, 4] + (
+        #                 self.sigma_growth_data[:, 2] - self.sigma_growth_data[:, 4]
+        #             )
 
-                    self.sigma_region[:, t] = self.sigma_region[:, t - 1] * (
-                        2.71828 ** (self.Sigma_gr[:, t] * 10)
-                    )
+        #             self.Sigma_gr[:, t] = self.Sigma_gr_RICE[:, t]
 
-            if scenario_sigma == 2:  # high SSP AEEI
-                # calculate the sigma growth and the emission rate development
-                if t == 1:
-                    self.Sigma_gr_RICE[:, t] = self.sigma_growth_data[:, 4] + (
-                        self.sigma_growth_data[:, 2] - self.sigma_growth_data[:, 4]
-                    )
-                    self.Sigma_gr[:, t] = self.Sigma_gr_RICE[:, t]
-                    self.sigma_region[:, t] = (
-                        self.sigma_region[:, t - 1]
-                        * (2.71828 ** (self.Sigma_gr[:, t] * 10))
-                        * self.emission_factor
-                    )
+        #             self.sigma_region[:, t] = (
+        #                 self.sigma_region[:, t - 1]
+        #                 * (2.71828 ** (self.Sigma_gr[:, t] * 10))
+        #                 * self.emission_factor
+        #             )
 
-                if t > 1:
-                    self.Sigma_gr_RICE[:, t] = self.sigma_growth_data[:, 4] + (
-                        self.Sigma_gr_RICE[:, t - 1] - self.sigma_growth_data[:, 4]
-                    ) * (1 - self.sigma_growth_data[:, 3])
+        #         if t > 1:
+        #             self.Sigma_gr_RICE[:, t] = self.sigma_growth_data[:, 4] + (
+        #                 self.Sigma_gr_RICE[:, t - 1] - self.sigma_growth_data[:, 4]
+        #             ) * (1 - self.sigma_growth_data[:, 3])
 
-                    self.Sigma_gr[:, t] = self.Sigma_gr_RICE[:, t] * 1.5
+        #             self.Sigma_gr[:, t] = self.Sigma_gr_RICE[:, t] * 0.5
 
-                    self.sigma_region[:, t] = self.sigma_region[:, t - 1] * (
-                        2.71828 ** (self.Sigma_gr[:, t] * 10)
-                    )
+        #             self.sigma_region[:, t] = self.sigma_region[:, t - 1] * (
+        #                 2.71828 ** (self.Sigma_gr[:, t] * 10)
+        #             )
+
+        #     if scenario_sigma == 2:  # high SSP AEEI
+        #         # calculate the sigma growth and the emission rate development
+        #         if t == 1:
+        #             self.Sigma_gr_RICE[:, t] = self.sigma_growth_data[:, 4] + (
+        #                 self.sigma_growth_data[:, 2] - self.sigma_growth_data[:, 4]
+        #             )
+        #             self.Sigma_gr[:, t] = self.Sigma_gr_RICE[:, t]
+        #             self.sigma_region[:, t] = (
+        #                 self.sigma_region[:, t - 1]
+        #                 * (2.71828 ** (self.Sigma_gr[:, t] * 10))
+        #                 * self.emission_factor
+        #             )
+
+        #         if t > 1:
+        #             self.Sigma_gr_RICE[:, t] = self.sigma_growth_data[:, 4] + (
+        #                 self.Sigma_gr_RICE[:, t - 1] - self.sigma_growth_data[:, 4]
+        #             ) * (1 - self.sigma_growth_data[:, 3])
+
+        #             self.Sigma_gr[:, t] = self.Sigma_gr_RICE[:, t] * 1.5
+
+        #             self.sigma_region[:, t] = self.sigma_region[:, t - 1] * (
+        #                 2.71828 ** (self.Sigma_gr[:, t] * 10)
+        #             )
 
         # calculate emission control rate under STANDARD
         if model_spec == ModelSpec.STANDARD:
@@ -584,7 +606,7 @@ class EconomyModel:
         # total cummulative emissions
         self.CCA_tot = self.CCA[:, t] + self.cumetree[:, t]
 
-        return self.E, self.Y_gross, self.Eind, self.sigma_region #added Eind and sigma_region
+        return self.E, self.Y_gross, self.Eind, self.sigma_region
 
     def run_net_economy(
         self,

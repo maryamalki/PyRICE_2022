@@ -55,12 +55,9 @@ class PyRICE(object):
 
         self.samples_t2xco2 = self.set_up_climate_sensitivity_distributions()
 
-    def __call__(
+    def setup(
         self,
-        growth_factor_prio=1,
         prioritarian_discounting=0,
-        sufficientarian_discounting=1,
-        growth_factor_suf=1,
         ini_suf_threshold_consumption=1.168,
         relative_damage_threshold=0.05,
         egalitarian_discounting=0,
@@ -73,49 +70,12 @@ class PyRICE(object):
         scenario_cback=0,
         scenario_elasticity_of_damages=0,
         scenario_limmiu=0,
-        longrun_scenario=1,
-        long_run_nordhaus_tfp_gr=1,
-        long_run_nordhaus_sigma=1,
-        long_run_nordhaus_pop_gr=1,
         sr=0.248,
         miu=2135,
         irstp_consumption=0.015,
         irstp_damage=0.015,
         emdd=0.8,
-        precision=10,
-        **kwargs,
     ):
-        """
-        @param growth_factor_prio: int: growth factor when prioritarian (0 = no discounting or 1 = conditional_growth)
-        @param prioritarian_discounting: int: how much the worst-off consumpt. needs to grow each tick to allow discou.
-        @param sufficientarian_discounting: int: 0 = inheritance discounting or, 1 = sustainable growth discounting
-        @param growth_factor_suf: int: growth factor when sufficientarian
-        @param ini_suf_threshold_consumption: float: initial sufficientarian threshold (based on poverty line $3.20 p/d)
-        @param relative_damage_threshold: float: percentage of how high damage can be compared to consumption
-        @param egalitarian_discounting: int: discounting when egalitarian (0 = no discouting  or 1 = normal discounting)
-        @param t2xco2_index: int: equilibrium temperature impact
-        @param t2xco2_dist: int: total factor productivity growth rate
-        @param fosslim: int: availability of fossil fuel
-        @param damage_function: DamageFunction
-        @param scenario_pop_gdp: int: population growth
-        @param scenario_sigma: int: CO2 efficiency development (emission to output growth rate)
-        @param scenario_cback: int: cost of the backstop technology
-        @param scenario_elasticity_of_damages: int:  damage relation for lower income groups
-        @param scenario_limmiu: int: 0 = base RICE or 1 = negative emissions possible
-        @param longrun_scenario: int: enables long run scenario (0 = long run uncertainty switch off or 1 = switched on)
-        @param long_run_nordhaus_tfp_gr: int: range in DICE [0.07, 0.09] in RICE 0.85 - 1.15
-        @param long_run_nordhaus_sigma: int: range in DICE [-0.012, -0.008] 0.75 - 1.25
-        @param long_run_nordhaus_pop_gr: int: range in DICE [0.1 0.15]   0.75 - 1.25
-        @param sr: float: savings rate
-        @param miu: int: global emissions target in which emissions are near zero
-        @param irstp_consumption: float: initial rate of social time preference of consumption
-        @param irstp_damage: float: initial rate of social time preference of damages
-        @param emdd: float: coefficient of relative risk aversion for climate damage
-        @param precision: int: precision of outcomes, {10, 20, 30}
-        @param kwargs:
-        @return:
-            self.data_dict: dictionary: all outcomes
-        """
         # Set up miu_period
         miu_period = (miu - self.start_year) / 10.0
 
@@ -228,6 +188,87 @@ class PyRICE(object):
             self.damages,
             self.Y,
         )
+    def run(
+        self,
+        growth_factor_prio=1,
+        prioritarian_discounting=0,
+        sufficientarian_discounting=1,
+        growth_factor_suf=1,
+        ini_suf_threshold_consumption=1.168,
+        relative_damage_threshold=0.05,
+        egalitarian_discounting=0,
+        t2xco2_index=-1,
+        t2xco2_dist=0,
+        fosslim=6000,
+        damage_function=DamageFunction.NORDHAUS,
+        scenario_pop_gdp=0,
+        scenario_sigma=0,
+        scenario_cback=0,
+        scenario_elasticity_of_damages=0,
+        scenario_limmiu=0,
+        longrun_scenario=1,
+        long_run_nordhaus_tfp_gr=1,
+        long_run_nordhaus_sigma=1,
+        long_run_nordhaus_pop_gr=1,
+        sr=0.248,
+        miu=2135,
+        irstp_consumption=0.015,
+        irstp_damage=0.015,
+        emdd=0.8,
+        precision=10,
+        **kwargs,
+    ):
+        """
+        @param growth_factor_prio: int: growth factor when prioritarian (0 = no discounting or 1 = conditional_growth)
+        @param prioritarian_discounting: int: how much the worst-off consumpt. needs to grow each tick to allow discou.
+        @param sufficientarian_discounting: int: 0 = inheritance discounting or, 1 = sustainable growth discounting
+        @param growth_factor_suf: int: growth factor when sufficientarian
+        @param ini_suf_threshold_consumption: float: initial sufficientarian threshold (based on poverty line $3.20 p/d)
+        @param relative_damage_threshold: float: percentage of how high damage can be compared to consumption
+        @param egalitarian_discounting: int: discounting when egalitarian (0 = no discouting  or 1 = normal discounting)
+        @param t2xco2_index: int: equilibrium temperature impact
+        @param t2xco2_dist: int: total factor productivity growth rate
+        @param fosslim: int: availability of fossil fuel
+        @param damage_function: DamageFunction
+        @param scenario_pop_gdp: int: population growth
+        @param scenario_sigma: int: CO2 efficiency development (emission to output growth rate)
+        @param scenario_cback: int: cost of the backstop technology
+        @param scenario_elasticity_of_damages: int:  damage relation for lower income groups
+        @param scenario_limmiu: int: 0 = base RICE or 1 = negative emissions possible
+        @param longrun_scenario: int: enables long run scenario (0 = long run uncertainty switch off or 1 = switched on)
+        @param long_run_nordhaus_tfp_gr: int: range in DICE [0.07, 0.09] in RICE 0.85 - 1.15
+        @param long_run_nordhaus_sigma: int: range in DICE [-0.012, -0.008] in RICE 0.75 - 1.25
+        @param long_run_nordhaus_pop_gr: int: range in DICE [0.1 0.15] in RICE 0.75 - 1.25
+        @param sr: float: savings rate
+        @param miu: int: global emissions target in which emissions are near zero
+        @param irstp_consumption: float: initial rate of social time preference of consumption
+        @param irstp_damage: float: initial rate of social time preference of damages
+        @param emdd: float: coefficient of relative risk aversion for climate damage
+        @param precision: int: precision of outcomes, {10, 20, 30}
+        @param kwargs:
+        @return:
+            self.data_dict: dictionary: all outcomes
+        """
+        self.setup(
+            prioritarian_discounting,
+            ini_suf_threshold_consumption,
+            relative_damage_threshold,
+            egalitarian_discounting,
+            t2xco2_index,
+            t2xco2_dist,
+            fosslim,
+            damage_function,
+            scenario_pop_gdp,
+            scenario_sigma,
+            scenario_cback,
+            scenario_elasticity_of_damages,
+            scenario_limmiu,
+            sr,
+            miu,
+            irstp_consumption,
+            irstp_damage,
+            emdd,
+        )
 
         # Run model
         for t in range(1, self.steps):
@@ -261,8 +302,7 @@ class PyRICE(object):
             )
 
             # Run net economy
-            (
-                self.CPC,
+            (   self.CPC,
                 self.region_pop,
                 self.damages,
                 self.Y,
@@ -287,9 +327,7 @@ class PyRICE(object):
 
         
             # Compute Utility
-            climate_impact_relative_to_capita = (
-                self.econ_model.get_climate_impact_relative_to_capita()
-            )
+            climate_impact_relative_to_capita = self.econ_model.get_climate_impact_relative_to_capita()
             CPC_post_damage = self.econ_model.get_cpc_post_damage()
 
             self.CPC, self.CPC_post_damage = self.utility_model.run(
