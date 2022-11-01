@@ -459,13 +459,12 @@ class EconomyModel:
             if t == 1:
                 self.ei_growth[:, t] = self.ei_growth[:, 0]
                 self.ci_growth[:, t] = self.ci_growth[:, 0]
-                self.Sigma_gr[:, t] = self.ei_growth[:, t] + self.ci_growth[:, t]
+                self.Sigma_gr[:, t] = self.ei_growth[:, t] * self.ci_growth[:, t]
                 self.sigma_region[:, t] = self.sigma_region[:, t - 1] * (math.e ** (self.Sigma_gr[:, t] * TIMESTEP)) * self.emission_factor
             if t > 1:
                 self.ei_growth[:, t] = self.ei_growth[:, t - 1] * (1 + self.ei_decline_rate * TIMESTEP) * long_run_nordhaus_sigma
                 self.ci_growth[:, t] = self.ci_growth[:, t - 1] * (1 + self.ci_decline_rate * TIMESTEP) * long_run_nordhaus_sigma
-
-                self.Sigma_gr[:, t] = self.ei_growth[:, t] + self.ci_growth[:, t]
+                self.Sigma_gr[:, t] = self.ei_growth[:, t] * self.ci_growth[:, t]
                 self.sigma_region[:, t] = self.sigma_region[:, t - 1] * (math.e ** (self.Sigma_gr[:, t] * TIMESTEP))
             
 
