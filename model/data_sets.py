@@ -130,7 +130,7 @@ class DataSets:
         self.primary_energy_kwh_per_country = calculate_primary_energy(df_gdp=self.gdp_per_country, df_ei=self.energy_intensity_per_country)
         self.primary_energy_kwh = aggregate_per_region(self.primary_energy_kwh_per_country)
         self.gdp = aggregate_per_region(self.gdp_per_country)
-        self.energy_intensity = self.primary_energy_kwh / (self.gdp / 1.15)  # Convert GDP from 2011 $ price to 2005 $ price
+        self.energy_intensity = self.primary_energy_kwh / (self.gdp /1.15)  # Convert GDP from 2011 $ price to 2005 $ price
 
         # Carbon intensity data
         self.carbon_intensity = self.carbon_emissions_kg / self.primary_energy_kwh

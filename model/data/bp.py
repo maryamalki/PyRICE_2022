@@ -61,40 +61,18 @@ def load_bp_primary_energy_data(path: str):
     # Aggregates from BP Dataset based on EIO
     Latin_America_BP = ["Mexico", "Total S. & Cent. America"]
     OHI_BP = ["Canada", "Australia", "New Zealand", "South Korea", "Singapore", "Taiwan", "China Hong Kong SAR"]
-    OECD_Europe_BP = [
-        "Austria",
-        "Belgium",
-        "Czech Republic",
-        "Denmark",
-        "Estonia",
-        "Finland",
-        "France",
-        "Germany",
-        "Greece",
-        "Hungary",
-        "Iceland",
-        "Ireland",
-        "Israel",
-        "Italy",
-        "Latvia",
-        "Lithuania",
-        "Luxembourg",
-        "Netherlands",
-        "Norway",
-        "Poland",
-        "Portugal",
-        "Slovakia",
-        "Slovenia",
-        "Spain",
-        "Sweden",
-        "Switzerland",
-        "Turkey",
-        "United Kingdom",
-    ]
-    Middle_East_BP = ["Iran", "Iraq", "Kuwait", "Oman", "Qatar", "Saudi Arabia", "United Arab Emirates", "Other Middle East", "Other Northern Africa", "Algeria", "Egypt", "Morocco"]
+    OECD_Europe_BP = ["Austria","Belgium","Czech Republic","Denmark","Estonia","Finland","France","Germany","Greece","Hungary","Iceland","Ireland","Israel","Italy",
+                        "Latvia","Lithuania","Luxembourg","Netherlands","Norway","Poland","Portugal","Slovakia","Slovenia","Spain","Sweden","Switzerland","Turkey",
+                        "United Kingdom",]
+    Middle_East_BP = ["Iran", "Iraq", "Kuwait", "Oman", "Qatar", "Saudi Arabia", "United Arab Emirates", "Other Middle East", "Other Northern Africa", "Algeria", 
+                        "Egypt", "Morocco"]
     Non_OECD_Asia_BP = ["Bangladesh", "Indonesia", "Malaysia", "Pakistan", "Philippines", "Sri Lanka", "Thailand", "Vietnam", "Other Asia Pacific"]
-    Non_Russia_Eurasia_BP = ["Azerbaijan", "Belarus", "Bulgaria", "Croatia", "Cyprus", "Kazakhstan", "North Macedonia", "Romania", "Turkmenistan", "Ukraine", "Uzbekistan", "Other CIS"]
+    Non_Russia_Eurasia_BP = ["Azerbaijan", "Belarus", "Bulgaria", "Croatia", "Cyprus", "Kazakhstan", "North Macedonia", "Romania", "Turkmenistan", "Ukraine", 
+                                "Uzbekistan", "Other CIS"]
     Africa_BP = ["South Africa", "Eastern Africa", "Middle Africa", "Western Africa", "Other Southern Africa"]
+
+
+    
 
     # Single Country Regions
     US_PE = bp_dataset_clean[bp_dataset_clean.index == Region.US.value]
