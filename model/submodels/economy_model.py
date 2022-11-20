@@ -148,14 +148,16 @@ class EconomyModel:
         # CO2-equivalent-emissions growth to output ratio in 2005
         #self.Sigma_gr[:, 0] = (CI_gr_2005 + EI_gr_2005).to_numpy()
 
-        # 10 year average growth rates for CI and EI 1995-2005
-        self.ei_decline_rate = -0.02
-        self.ci_decline_rate = -0.005
-
+        
+        # Initial growth rates based on 10-year average growth rate between 1996 to 2005
         self.ei_growth = np.zeros((self.n_regions, steps))
         self.ci_growth = np.zeros((self.n_regions, steps))
         self.ei_growth[:, 0] = EI_gr_2005.to_numpy()
         self.ci_growth[:, 0] = CI_gr_2005.to_numpy()
+
+        # Delcine rates changed for different experiments (ci: 0.09%, 0.14%, 0.3% & ei: 1%, 1.5%, 2%)
+        self.ei_decline_rate = -2/100
+        self.ci_decline_rate = -0.3/100
 
         # Cback per region
         ratio_backstop_world = np.array(
