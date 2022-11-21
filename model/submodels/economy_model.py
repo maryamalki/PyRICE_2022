@@ -111,11 +111,11 @@ class EconomyModel:
         self.partfractfull = 1.0
 
         # Decline rate of decarbonization (per period)
-        self.decl_sigma_gr = -0.001
+        #self.decl_sigma_gr = -0.001
 
         # Carbon emissions from land 2010 [GtCO2 per year]
         self.eland0 = 1.6
-        # Decline rate of land emissions (per period) CHECKED
+        # Decline rate of land emissions (per period)
         self.ecl_land = 0.2
 
         # Emission data_dict
