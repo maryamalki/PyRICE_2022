@@ -155,9 +155,9 @@ class EconomyModel:
         self.ei_growth[:, 0] = EI_gr_2005.to_numpy()
         self.ci_growth[:, 0] = CI_gr_2005.to_numpy()
 
-        # Delcine rates changed for different experiments (ci: 0.09%, 0.14%, 0.3% & ei: 1%, 1.5%, 2%)
-        self.ei_decline_rate = -2/100
-        self.ci_decline_rate = -0.3/100
+        # Delcine rates changed for different experiments (ci: 0.2%, 0.3%, 0.5% & ei: 1%, 1.5%, 2%)
+        self.ei_decline_rate = -1/100
+        self.ci_decline_rate = -0.2/100
 
         # Cback per region
         ratio_backstop_world = np.array(
@@ -457,26 +457,48 @@ class EconomyModel:
             self.Y_gross[:, t] = np.where(self.Y_gross[:, t] > 0, self.Y_gross[:, t], 0)
 
 
-            # calculate the sigma growth adjust with uncertainty range and the emission rate development
+            # Option 1: calculate the ei and ci growth and energy and carbon intensities
             if t == 1:
+
+                # Calculating ei and ci growths at t = 1
                 self.ei_growth[:, t] = self.ei_growth[:, 0]
                 self.ci_growth[:, t] = self.ci_growth[:, 0]
-                self.energy_intensity[:,t] = self.energy_intensity[:, t -1] * (math.e ** (self.ei_growth[:, t] * TIMESTEP)) 
-                self.carbon_intensity[:,t] = self.carbon_intensity[:, t -1] * (math.e ** (self.ci_growth[:, t] * TIMESTEP))
-                self.sigma_region[:, t] = self.energy_intensity[:, t] * self.carbon_intensity[:, t]
 
-                #self.Sigma_gr[:, t] = self.ei_growth[:, t] + self.ci_growth[:, t]
-                #self.sigma_region[:, t] = self.sigma_region[:, t - 1] * (math.e ** (self.Sigma_gr[:, t] * TIMESTEP)) * self.emission_factor
+                # Calculating corresponding energy and carbon intensity
+                self.energy_intensity[:,t] = self.energy_intensity[:, t -1] * (math.e ** (self.ei_growth[:, t - 1] * TIMESTEP)) 
+                self.carbon_intensity[:,t] = self.carbon_intensity[:, t -1] * (math.e ** (self.ci_growth[:, t - 1] * TIMESTEP))
+
+                # Computing sigma as the product of energy and carbon intensity
+                self.sigma_region[:, t] = self.energy_intensity[:, t] * self.carbon_intensity[:, t]
 
             if t > 1:
-                self.ei_growth[:, t] = self.ei_growth[:, t - 1] * (1 + self.ei_decline_rate * TIMESTEP) * long_run_nordhaus_sigma
-                self.ci_growth[:, t] = self.ci_growth[:, t - 1] * (1 + self.ci_decline_rate * TIMESTEP) * long_run_nordhaus_sigma
-                self.energy_intensity[:,t] = self.energy_intensity[:, t -1] * (math.e ** (self.ei_growth[:, t] * TIMESTEP))
-                self.carbon_intensity[:,t] = self.carbon_intensity[:, t -1] * (math.e ** (self.ci_growth[:, t] * TIMESTEP))
+
+                # Calculating ei and ci growth as a function of the decline rates of ei and ci 
+                self.ei_growth[:, t] = self.ei_growth[:, t - 1] * (1 + self.ei_decline_rate) ** TIMESTEP * long_run_nordhaus_sigma
+                self.ci_growth[:, t] = self.ci_growth[:, t - 1] * (1 + self.ci_decline_rate) ** TIMESTEP * long_run_nordhaus_sigma
+
+                # Calculating corresponding energy and carbon intensity
+                self.energy_intensity[:,t] = self.energy_intensity[:, t -1] * (math.e ** (self.ei_growth[:, t - 1] * TIMESTEP))
+                self.carbon_intensity[:,t] = self.carbon_intensity[:, t -1] * (math.e ** (self.ci_growth[:, t - 1] * TIMESTEP))
+
+                # Computing sigma as the product of energy and carbon intensity
                 self.sigma_region[:, t] = self.energy_intensity[:, t] * self.carbon_intensity[:, t]
-                
-                #self.Sigma_gr[:, t] = self.ei_growth[:, t] + self.ci_growth[:, t]
-                #self.sigma_region[:, t] = self.sigma_region[:, t - 1] * (math.e ** (self.Sigma_gr[:, t] * TIMESTEP))
+ 
+            # Option 2: calculate ei and ci growth nd energy and carbon intensities based on the original PyRICE growth calculation    
+            # if t == 1:
+            #     self.ei_growth[:, t] = self.ei_growth[:, 0]
+            #     self.ci_growth[:, t] = self.ci_growth[:, 0]
+            #     self.energy_intensity[:,t] = self.energy_intensity[:, t - 1] * (math.e ** (self.ei_growth[:, t - 1] * TIMESTEP)) 
+            #     self.carbon_intensity[:,t] = self.carbon_intensity[:, t -1] * (math.e ** (self.ci_growth[:, t - 1] * TIMESTEP))
+            #     self.sigma_region[:, t] = self.energy_intensity[:, t] * self.carbon_intensity[:, t]
+
+            # if t > 1:
+            #     self.ei_growth[:, t] = self.sigma_growth_data[:, 4]  + (self.ei_growth[:, t - 1] - self.sigma_growth_data[:, 4]) * (1 + (self.ei_decline_rate * 10)) * long_run_nordhaus_sigma
+            #     self.ci_growth[:, t] = self.sigma_growth_data[:, 4]  + (self.ci_growth[:, t - 1] - self.sigma_growth_data[:, 4]) * (1 + (self.ci_decline_rate * 10)) * long_run_nordhaus_sigma
+            #     self.energy_intensity[:,t] = self.energy_intensity[:, t -1] * (math.e ** (self.ei_growth[:, t - 1] * TIMESTEP)) 
+            #     self.carbon_intensity[:,t] = self.carbon_intensity[:, t -1] * (math.e ** (self.ci_growth[:, t - 1] * TIMESTEP))
+            #     self.sigma_region[:, t] = self.energy_intensity[:, t] * self.carbon_intensity[:, t]
+
             
         # calculate emission control rate under STANDARD
         if model_spec == ModelSpec.STANDARD:
